@@ -9,11 +9,13 @@ from __future__ import print_function, division
 # Developed for aiwolf 0.4.12 (2018/06/16)
 # Author: ehauckdo
 
+import time
 import aiwolfpy
 import aiwolfpy.contentbuilder as cb
 
 import random
 import optparse
+import numpy as np
 import sys
 
 from utility import *
@@ -33,6 +35,23 @@ class SampleAgent(object):
 		self.target_list = []  # a queue storing possible targets to act against
 		self.current_target = None
 
+                '''
+                The info table stores the information we have about each player,
+                along with it's provenance - the columns are the sources of information (other players)
+                and the lines are the players - the sum of each line is a score - positive for villager, negative for werewolf.
+                '''
+		self.info_table = None
+
+                #conflict_list for pairs of players of which one is certainly a werewolf.
+		self.conflict_list = []
+		self.white_list = []
+		self.black_list = []
+
+		#ids of seer, medium, and bodyguard, None if unknown
+		self.seer_id = None if self.base_info["myRole"] != "SEER" else self.id
+		self.medium_id = None if self.base_info["myRole"] != "MEDIUM" else self.id
+		self.bodyguard_id = None if self.base_info["myRole"] != "BODYGUARD" else self.id
+
 		printGameSetting(game_setting)
 		self.updatePlayerMap(base_info)
 
@@ -49,8 +68,15 @@ class SampleAgent(object):
 		self.updateGameHistory(diff_data)
 		self.updatePlayerMap(base_info)
 
+                # initialize the info table
+		if not self.info_table:
+                        num_players = len(self.player_map)
+                        self.info_table = np.zeros([num_players,num_players])
+
 	def dayStart(self):
 		print("Executing dayStart...")
+
+		
 
 		# at the start of each day, either assign a new random target
 		# or fetch a new target from the target list (agents who previously voted against us)
@@ -159,6 +185,50 @@ class SampleAgent(object):
 			agent = getattr(row, "agent")
 			text = getattr(row, "text")
 
+                        #meaning the talker attributed me the wrong role
+                        lie = "{:02d}".format(self.id) in text and self.base_info["myRole"] != text.split(' ')[-1]
+                        
+                        '''
+                        Someone is pretending to be seer:
+                        * if he tells about us wrong information, we know him for a werewolf
+                        * if we are the seer, we know him for a werewolf
+                        * if no conflict occurs, we believe him
+                        * if another one says he is seer, put the two of them in conflict list and believe none
+                        '''
+			if "DIVINED" in text and agent != self.id:
+                                if self.seer_id == self.id or lie:
+                                    setTarget(agent,1)
+                                elif self.seer_id != agent and self.seer_id != None:
+                                    self.conflict_list.append([self.seer_id, agent])
+                                else:
+                                    if self.seer_id == None:
+                                            self.seer_id = agent
+                                    self.info_table[text.split(' ')[-1]
+
+
+                        # medium works like seer approximately
+			if "IDENTIFIED" in text and agent != self.id:
+                                if self.medium_id == self.id:
+                                    setTarget(agent, 1)
+                                elif self.medium_id != agent and self.seer_id != None:
+                                    self.conflict_list.append([self.seer_id, agent])
+                                else:
+                                    if self.seer_id == None:
+                                            self.seer_id = agent
+                                    self.info_table[text.split(' ')[-1]
+
+                        # medium works like seer approximately
+			if "GUARDED" in text and agent != self.id:
+                                if self.bodyguard_id == self.id:
+                                        setTarget(agent, 1)
+                                elif 
+                                    self.medium_id = agent
+                                else:
+                                    self.conflict_list.append([self.medium_id, agent])
+
+
+                        
+                        '''
 			# if anyone votes, estimates, or divines on our agent
 			# we set this person as a target
 			if "{:02d}".format(self.id) in text:
@@ -171,13 +241,24 @@ class SampleAgent(object):
 					# otherwise, set this new agent as the current target
 					else:
 						self.setTarget(agent, True)
+			'''
 						
 	# Set some agent as the current target. Revenge param says 
 	# whether or not this agent acted against us before
-	def setTarget(self, id, revenge):
+	def setTarget(self, id, black_list):
 		self.current_target = id
+		self.black_list.add(id)
 
-		self.player_map[id]["revenge"] = revenge
+                # if i am certain the target is werewolf, make all those in conflict with him villagers
+                if black_list:
+                        for pair in conflict_list:
+                                if id in pair:
+                                        for player in pair:
+                                                if player != id:
+                                                        self.white_list.add(player)
+                                
+
+		self.player_map[id]["revenge"] = black_list
 		self.player_map[id]["targetStatus"] = 0
 
 

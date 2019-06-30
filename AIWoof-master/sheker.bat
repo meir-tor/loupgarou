@@ -1,0 +1,1 @@
+py C:\Users\mm\Downloads\aiwolf-ver0.5.4\AIWoof-master\omgyousuck.py -h localhost -p 10000
