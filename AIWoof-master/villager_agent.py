@@ -76,9 +76,19 @@ class SampleAgent(object):
 
 	def update(self, base_info, diff_data, request):
 		print("Executing update...")
+
+                #check whether someone died
+                living = len([v for v in self.base_info["statusMap"] if v == "ALIVE"])
+                new_living = len([v for v in base_info["statusMap"] if v == "ALIVE"])
+		
 		self.base_info = base_info
 
-		
+
+
+		if living == new_living:
+                    self.no_dead = True
+                else:
+                    self.no_dead = False
 		
 		printBaseInfo(base_info)
 		printDiffData(diff_data)
@@ -91,7 +101,7 @@ class SampleAgent(object):
 
 		#TODO - add here what happens at first day - werewolf and seer
 
-		
+		if 
 
 		# at the start of each day, either assign a new random target
 		# or fetch a new target from the target list (agents who previously voted against us)
