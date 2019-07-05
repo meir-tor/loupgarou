@@ -101,24 +101,50 @@ class SampleAgent(object):
 
 		#TODO - add here what happens at first day - werewolf and seer
 
-		if 
 
-		# at the start of each day, either assign a new random target
-		# or fetch a new target from the target list (agents who previously voted against us)
-		if self.current_target is None or self.player_map[self.current_target]["status"] == "DEAD":
-			
-			while len(self.target_list) > 0:
-				selected = self.target_list.pop(0)
-				if self.player_map[selected]["status"] != "DEAD":
-					print("Selected new target from target_list, ID: "+str(selected))
-					self.setTarget(selected, True)
-					break
-			# if there are no agents in the target list or they are already dead,
-			# target a new random agent
-			else:
-				selected = randomPlayerId(self.base_info)
-				print("Selecting a random target... Selected ID: "+str(selected))
-				self.setTarget(selected, False)
+		# we use a copy so that if the value of some player changes we still have the information
+                table = np.copy(self.info_table)
+
+                #if i have someone on my black list, chose him as target
+		if blacklist:
+                    self.current_target = blacklist[0]
+                else:
+                    #all the members in conflict are suspect to be werewolves
+                    suspects_list = set([y for x in self.conflict_list for y in x]
+                                        
+                    #give the columns weights based on the identity of players (seer/medium/suspected as werewolf...)
+                    for i in range(self.table.shape[1]):
+                            if i == self.seer_id:
+                                array[:,i] = self.seer_value * array[:,i]
+                            if i == self.medium_id:
+                                array[:,i] = self.medium_value * array[:,i]
+                            if i == self.bodyguard_id:
+                                array[:,i] = self.bg_value * array[:,i]
+                            if i in suspects_list:
+                                array[:,i] = array[:,i] = self.suspect_value * array[:,i]
+
+                    #pick as target the player with lowest score
+                    self.current_target = np.argmin(np.sum(table, axis=1))
+                
+                        
+##
+##
+##		# at the start of each day, either assign a new random target
+##		# or fetch a new target from the target list (agents who previously voted against us)
+##		if self.current_target is None or self.player_map[self.current_target]["status"] == "DEAD":
+##			
+##			while len(self.target_list) > 0:
+##				selected = self.target_list.pop(0)
+##				if self.player_map[selected]["status"] != "DEAD":
+##					print("Selected new target from target_list, ID: "+str(selected))
+##					self.setTarget(selected, True)
+##					break
+##			# if there are no agents in the target list or they are already dead,
+##			# target a new random agent
+##			else:
+##				selected = randomPlayerId(self.base_info)
+##				print("Selecting a random target... Selected ID: "+str(selected))
+##				self.setTarget(selected, False)
 
 	def talk(self):
 		print("Executing talk...")
@@ -254,13 +280,13 @@ class SampleAgent(object):
                                 #if there's already a seer, and the current one contests him, put them in conflict
                                 elif self.seer_id != agent and self.seer_id != None:
                                     self.conflict_list.append([self.seer_id, agent])
-                                    self.seer_value = 1
+                                    self.seer_id = -1
                                 else:
                                     if self.seer_id == None:
                                             self.seer_id = agent
 
                                     #add to score of the target the value we accord to seer
-                                    self.info_table[target][agent] += seer_value if target_role == "VILLAGER" else -1*seer_value
+                                    self.info_table[target][agent] += 1 if target_role == "VILLAGER" else -1
 
 
                         # medium works like seer approximately
@@ -269,13 +295,13 @@ class SampleAgent(object):
                                     setTarget(agent, 1)
                                 elif self.medium_id != agent and self.medium_id != None:
                                     self.conflict_list.append([self.medium_id, agent])
-                                    self.medium_value = 1
+                                    self.medium_id = -1
                                 else:
                                     if self.medium_id == None:
                                             self.medium_id = agent
 
                                     #add to score of the target the value we accord to seer
-                                    self.info_table[target][agent] += medium_value if target_role == "VILLAGER" else -1*medium_value
+                                    self.info_table[target][agent] += 1 if target_role == "VILLAGER" else -1
 
                         # medium works like seer approximately
 			if "GUARDED" in text:
@@ -286,11 +312,11 @@ class SampleAgent(object):
                                     #bodyguard contested    
                                     if self.bg_id != agent and self.bg_id != None:
                                         self.conflict_list.append([self.bg_id, agent])
-                                        self.bg_value = 1
+                                        self.bg_id = -1
                                     #bodyguard not contested
                                     else:
                                         self.bg_id = agent if self.bg_id == None else self.bg_id
-                                    self.info_table[target][agent] += bg_value
+                                    self.info_table[target][agent] += 1
                                 #there were dead during night
                                 else:
                                     pass
@@ -313,11 +339,12 @@ class SampleAgent(object):
 						self.setTarget(agent, True)
 			'''
 						
-	# Set some agent as the current target. Revenge param says 
-	# whether or not this agent acted against us before
 	def setTarget(self, id, black_list):
 		self.current_target = id
 		self.black_list.add(id)
+
+                #if we chose someone as target, it means all his info is wrong, and therefore multiplied by -1
+                self.info_table[:,id] *= -1
 
                 # if i am certain the target is werewolf, make all those in conflict with him villagers
                 if black_list:
@@ -328,8 +355,8 @@ class SampleAgent(object):
                                                         self.white_list.add(player)
                                 
 
-		self.player_map[id]["revenge"] = black_list
-		self.player_map[id]["targetStatus"] = 0
+##		self.player_map[id]["revenge"] = black_list
+##		self.player_map[id]["targetStatus"] = 0
 
 
 def parseArgs(args):
