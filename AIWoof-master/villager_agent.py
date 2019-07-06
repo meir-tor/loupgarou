@@ -247,7 +247,7 @@ class SampleAgent(object):
             for command in ["ESTIMATE", "VOTE", "DIVINED"]:
                     #this splitting should get the id of the target
                     if command in text:
-                            target = text.split(command)[1][8]
+                            target = int(text.split(command)[1][8])
                             target_role = "WEREWOLF" if text.split(command)[1][11] == "W" else "VILLAGER"
 
             #this variable says whether we are unjustly targeted
