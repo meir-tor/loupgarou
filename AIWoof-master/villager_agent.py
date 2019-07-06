@@ -342,7 +342,7 @@ class SampleAgent(object):
 
         # Set someone as black for the first time
         if id not in self.black_list:
-            self.black_list.add(id)
+            self.black_list.append(id)
 
             #if we chose someone as target, it means all his info is wrong, and therefore multiplied by -1
             # DAN: Note, we can't do this once, we have to do this multiplier every time the agent accceses the info_table values
@@ -354,7 +354,7 @@ class SampleAgent(object):
                 if id in pair:
                     for player in pair:
                         if player != id:
-                            self.white_list.add(player)
+                            self.white_list.append(player)
                         
 
 ##        self.player_map[id]["revenge"] = black_list
