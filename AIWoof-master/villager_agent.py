@@ -108,7 +108,7 @@ class SampleAgent(object):
 
         #if i have someone on my black list, chose him as target
         if len(self.black_list) > 0:
-            self.current_target = self.black_list[0]
+            self.setTarget(self.black_list[0])
         else:
             #all the members in conflict are suspect to be werewolves
             suspects_list = set([y for x in self.conflict_list for y in x])
@@ -125,7 +125,7 @@ class SampleAgent(object):
                     table[:,i] = self.suspect_value * table[:,i]
 
             #pick as target the player with lowest score
-            self.current_target = np.argmin(np.sum(table, axis=1))
+            self.setTarget(np.argmin(np.sum(table, axis=1)) + 1)
                 
                         
 ##
@@ -150,11 +150,13 @@ class SampleAgent(object):
     def talk(self):
         print("Executing talk...")
         
+        '''
         if self.player_map[self.current_target]["revenge"] is False: 
             print("Voting on random target")
         else:
             print("Voting for revenge!")
-
+        '''
+            
         # Talking against a target has 3 steps: (0) first estimate,
         # then (1) state your vote, then (>2) start requesting other 
         # agents to vote against the current target
@@ -274,7 +276,7 @@ class SampleAgent(object):
                     if self.seer_id == agent:
                         self.seer_id = None
                         self.seer_value = 2
-                        setTarget(agent,1)
+                        self.setTarget(agent)
                     #if there's already a seer, and the current one contests him, put them in conflict
                     elif self.seer_id != agent and self.seer_id != None:
                         self.conflict_list.append([self.seer_id, agent])
@@ -290,7 +292,7 @@ class SampleAgent(object):
             # medium works like seer approximately
             if "IDENTIFIED" in text:
                 if self.medium_id == self.id:
-                    setTarget(agent, 1)
+                    self.setTarget(agent)
                 elif self.medium_id != agent and self.medium_id != None:
                     self.conflict_list.append([self.medium_id, agent])
                     self.medium_id = -1
@@ -304,7 +306,7 @@ class SampleAgent(object):
             # bodyguard works like seer approximately
             if "GUARDED" in text:
                 if self.bg_id == self.id:
-                        setTarget(agent, 1)
+                    self.setTarget(agent)
                 #if there are no dead
                 elif self.no_dead:
                     #bodyguard contested    
@@ -334,15 +336,20 @@ class SampleAgent(object):
                         self.setTarget(agent, True)
             '''
                         
-    def setTarget(self, id, black_list):
+    def setTarget(self, id):
         self.current_target = id
-        self.black_list.add(id)
+        self.player_map[id]["targetStatus"] = 0
 
-        #if we chose someone as target, it means all his info is wrong, and therefore multiplied by -1
-        self.info_table[:,id] *= -1
+        # Set someone as black for the first time
+        if id not in self.black_list:
+            self.black_list.add(id)
 
-        # if i am certain the target is werewolf, make all those in conflict with him villagers
-        if black_list:
+            #if we chose someone as target, it means all his info is wrong, and therefore multiplied by -1
+            # DAN: Note, we can't do this once, we have to do this multiplier every time the agent accceses the info_table values
+            #       so what this function should do isn't to multiply the values, it's to set a "multiply by -1" flag
+            self.info_table[:,id] *= -1
+
+            # if i am certain the target is werewolf, make all those in conflict with him villagers
             for pair in conflict_list:
                 if id in pair:
                     for player in pair:
@@ -351,7 +358,6 @@ class SampleAgent(object):
                         
 
 ##        self.player_map[id]["revenge"] = black_list
-##        self.player_map[id]["targetStatus"] = 0
 
 
 def parseArgs(args):
