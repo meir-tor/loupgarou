@@ -31,22 +31,23 @@ class SampleAgent(object):
         self.game_setting = game_setting
 
         self.game_history = {} # stores each sentence stated from each day
-#        self.player_map = {}   # a map with the status and other info for each player
+        self.player_map = {}   # a map with the status and other info for each player
         self.target_list = []  # a queue storing possible targets to act against
         self.current_target = None
-
+        
         '''
         The info table stores the information we have about each player,
         along with it's provenance - the columns are the sources of information (other players)
         and the lines are the players - the sum of each line is a score - positive for villager, negative for werewolf.
         '''
         num_players = game_setting["playerNum"]
+        
         self.info_table = np.zeros([num_players,num_players])
 
         #number of werewolves
         self.ww_number = game_setting["roleNumMap"]["WEREWOLF"]
 
-                #conflict_list for pairs of players of which one is certainly a werewolf.
+        #conflict_list for pairs of players of which one is certainly a werewolf.
         self.conflict_list = []
         self.white_list = []
         self.black_list = []
@@ -69,7 +70,7 @@ class SampleAgent(object):
         self.no_dead = False
 
         printGameSetting(game_setting)
-#        self.updatePlayerMap(base_info)
+        self.updatePlayerMap(base_info)
 
     def getName(self):
         return self.myname
@@ -106,11 +107,11 @@ class SampleAgent(object):
         table = np.copy(self.info_table)
 
         #if i have someone on my black list, chose him as target
-        if blacklist:
-            self.current_target = blacklist[0]
+        if len(self.black_list) > 0:
+            self.current_target = self.black_list[0]
         else:
             #all the members in conflict are suspect to be werewolves
-            suspects_list = set([y for x in self.conflict_list for y in x]
+            suspects_list = set([y for x in self.conflict_list for y in x])
                                 
             #give the columns weights based on the identity of players (seer/medium/suspected as werewolf...)
             for i in range(self.table.shape[1]):
@@ -209,9 +210,6 @@ class SampleAgent(object):
         print("Executing finish...")
 
     def updatePlayerMap(self, base_info):
-        if self.player_map == None:
-            self.player_map = {}
-        
         for key, value in base_info["statusMap"].items():
             agent_id = int(key)
             if agent_id is not self.id:
