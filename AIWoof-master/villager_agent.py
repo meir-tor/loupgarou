@@ -253,40 +253,45 @@ class SampleAgent(object):
                 match = re.match(RE_VOTE, text[text.index("VOTE"):])
             elif "DIVINED" in text:
                 match = re.match(RE_DIVINED, text[text.index("DIVINED"):])
+            elif "IDENTIFIED" in text:
+                match = re.match(RE_IDENTIFIED, text[text.index("IDENTIFIED"):])
+            elif "GUARDED" in text:
+                match = re.match(RE_GUARDED, text[text.index("GUARDED"):])
             else:
                 continue
             
             target_role = match.group("role") if "role" in match.groupdict() else None
             target = match.group("target")
+            target_id = int(re.match(RE_AGENT_GROUP, target).group("id"))
             
             if target != "ANY":
                 # this variable says whether we are unjustly targeted
                 if "ESTIMATE" in text or "DIVINED" in text:
                     # Check if we're being accused of a role we are not
-                    lie = (re.match(RE_AGENT_GROUP, target).group("id") == self.id and
-                        self.base_info["myRole"] != target_role)
+                    lie = (target_id == self.id and self.base_info["myRole"] != target_role)
                 elif "VOTE" in text:
                     # Check if we're being voted
-                    lie = re.match(RE_AGENT_GROUP, target).group("id") == self.id
+                    lie = target_id == self.id
                         
             #we give 0.5 point for estimates - positive for "villager", negative for "werewolf"
             if "ESTIMATE" in text and not lie:
                 #add to score of the target the value we accord to seer
-                self.info_table[target][agent] += 0.5 if target_role == "VILLAGER" else -0.5
+                self.info_table[target_id][agent] += 0.5 if target_role == "VILLAGER" else -0.5
 
             #we give 1 point for votes - positive for "villager", negative for "werewolf"
-            if "VOTE" in text and not lie:
+            elif "VOTE" in text and not lie:
                 #add to score of the target the value we accord to seer
-                self.info_table[target][agent] += 1 if target_role == "VILLAGER" else -1
+                self.info_table[target_id][agent] += 1 if target_role == "VILLAGER" else -1
             
-            '''
-            Someone is pretending to be seer:
-            * if he tells about us wrong information, we know him for a werewolf
-            * if we are the seer, we know him for a werewolf
-            * if no conflict occurs, we believe him
-            * if another one says he is seer, put the two of them in conflict list and believe none
-            '''
-            if "DIVINED" in text:
+            
+            elif "DIVINED" in text:
+                '''
+                Someone is pretending to be seer:
+                * if he tells about us wrong information, we know him for a werewolf
+                * if we are the seer, we know him for a werewolf
+                * if no conflict occurs, we believe him
+                * if another one says he is seer, put the two of them in conflict list and believe none
+                '''
                 #if i am the seer and not the talker, or if he lies about me, kill him!
                 if self.seer_id == self.id or lie:
                     if self.seer_id == agent:
@@ -302,11 +307,11 @@ class SampleAgent(object):
                             self.seer_id = agent
 
                         #add to score of the target the value we accord to seer
-                        self.info_table[target][agent] += 1 if target_role == "VILLAGER" else -1
+                        self.info_table[target_id][agent] += 1 if target_role == "VILLAGER" else -1
 
 
             # medium works like seer approximately
-            if "IDENTIFIED" in text:
+            elif "IDENTIFIED" in text:
                 if self.medium_id == self.id:
                     self.setTarget(agent)
                 elif self.medium_id != agent and self.medium_id != None:
@@ -317,10 +322,10 @@ class SampleAgent(object):
                         self.medium_id = agent
 
                     #add to score of the target the value we accord to seer
-                    self.info_table[target][agent] += 1 if target_role == "VILLAGER" else -1
+                    self.info_table[target_id][agent] += 1 if target_role == "VILLAGER" else -1
 
             # bodyguard works like seer approximately
-            if "GUARDED" in text:
+            elif "GUARDED" in text:
                 if self.bg_id == self.id:
                     self.setTarget(agent)
                 #if there are no dead
@@ -332,7 +337,7 @@ class SampleAgent(object):
                     #bodyguard not contested
                     else:
                         self.bg_id = agent if self.bg_id == None else self.bg_id
-                    self.info_table[target][agent] += 1
+                    self.info_table[target_id][agent] += 1
                 #there were dead during night
                 else:
                     pass
