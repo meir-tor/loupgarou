@@ -22,336 +22,364 @@ from utility import *
 
 class SampleAgent(object):
 
-	def __init__(self, agent_name):
-		self.myname = agent_name
+    def __init__(self, agent_name):
+        self.myname = agent_name
 
-	def initialize(self, base_info, diff_data, game_setting):
-		self.id = base_info["agentIdx"]
-		self.base_info = base_info
-		self.game_setting = game_setting
+    def initialize(self, base_info, diff_data, game_setting):
+        self.id = base_info["agentIdx"]
+        self.base_info = base_info
+        self.game_setting = game_setting
 
-		self.game_history = {} # stores each sentence stated from each day
-#		self.player_map = {}   # a map with the status and other info for each player
-		self.target_list = []  # a queue storing possible targets to act against
-		self.current_target = None
+        self.game_history = {} # stores each sentence stated from each day
+        self.player_map = {}   # a map with the status and other info for each player
+        self.target_list = []  # a queue storing possible targets to act against
+        self.current_target = None
+        
+        '''
+        The info table stores the information we have about each player,
+        along with it's provenance - the columns are the sources of information (other players)
+        and the lines are the players - the sum of each line is a score - positive for villager, negative for werewolf.
+        '''
+        num_players = game_setting["playerNum"]
+        
+        self.info_table = np.zeros([num_players,num_players])
 
-                '''
-                The info table stores the information we have about each player,
-                along with it's provenance - the columns are the sources of information (other players)
-                and the lines are the players - the sum of each line is a score - positive for villager, negative for werewolf.
-                '''
-		num_players = game_setting["playerNum"]
-                self.info_table = np.zeros([num_players,num_players])
+        #number of werewolves
+        self.ww_number = game_setting["roleNumMap"]["WEREWOLF"]
 
-		#number of werewolves
-		self.ww_number = game_setting["roleNumMap"]["WEREWOLF"]
+        #conflict_list for pairs of players of which one is certainly a werewolf.
+        self.conflict_list = []
+        self.white_list = []
+        self.black_list = []
 
-                #conflict_list for pairs of players of which one is certainly a werewolf.
-		self.conflict_list = []
-		self.white_list = []
-		self.black_list = []
+        #ids of seer, medium, and bodyguard, None if unknown
+        self.seer_id = None if base_info["myRole"] != "SEER" else self.id
+        self.medium_id = None if base_info["myRole"] != "MEDIUM" else self.id
+        self.bg_id = None if base_info["myRole"] != "BODYGUARD" else self.id
 
-		#ids of seer, medium, and bodyguard, None if unknown
-		self.seer_id = None if base_info["myRole"] != "SEER" else self.id
-		self.medium_id = None if base_info["myRole"] != "MEDIUM" else self.id
-		self.bg_id = None if base_info["myRole"] != "BODYGUARD" else self.id
+        # MEIR - these constants will be multiplied with the 'value' of information
+        # if one is suspect of being WEREWOLF, we treat his info less,
+        #if one is believed to be SEER or MEDIUM, his word is worth more
+        #if one is believed to be BODYGUARD, his word is worth more - since he proved it
+        self.seer_value = 2
+        self.medium_value = 2
+        self.bg_value = 5
+        self.suspect_value = 0.2
 
-                # MEIR - these constants will be multiplied with the 'value' of information
-                # if one is suspect of being WEREWOLF, we treat his info less,
-                #if one is believed to be SEER or MEDIUM, his word is worth more
-                #if one is believed to be BODYGUARD, his word is worth more - since he proved it
-                self.seer_value = 2
-                self.medium_value = 2
-                self.bg_value = 5
-                self.suspect_value = 0.2
+        #MEIR - this variable will be used to test the claim of bodyguard
+        self.no_dead = False
 
-                #MEIR - this variable will be used to test the claim of bodyguard
-                self.no_dead = False
+        printGameSetting(game_setting)
+        self.updatePlayerMap(base_info)
 
-		printGameSetting(game_setting)
-#		self.updatePlayerMap(base_info)
+    def getName(self):
+        return self.myname
 
-	def getName(self):
-		return self.myname
+    def update(self, base_info, diff_data, request):
+        print("Executing update...")
 
-	def update(self, base_info, diff_data, request):
-		print("Executing update...")
-
-                #check whether someone died
-                living = len([v for v in self.base_info["statusMap"] if v == "ALIVE"])
-                new_living = len([v for v in base_info["statusMap"] if v == "ALIVE"])
-		
-		self.base_info = base_info
+        #check whether someone died
+        living = len([v for v in self.base_info["statusMap"] if v == "ALIVE"])
+        new_living = len([v for v in base_info["statusMap"] if v == "ALIVE"])
+        
+        self.base_info = base_info
 
 
 
-		if living == new_living:
-                    self.no_dead = True
-                else:
-                    self.no_dead = False
-		
-		printBaseInfo(base_info)
-		printDiffData(diff_data)
-		
-		self.updateGameHistory(diff_data)
-		self.updatePlayerMap(base_info)
+        if living == new_living:
+            self.no_dead = True
+        else:
+            self.no_dead = False
+        
+        printBaseInfo(base_info)
+        printDiffData(diff_data)
+        
+        self.updateGameHistory(diff_data)
+        self.updatePlayerMap(base_info)
 
-	def dayStart(self):
-		print("Executing dayStart...")
+    def dayStart(self):
+        print("Executing dayStart...")
 
-		#TODO - add here what happens at first day - werewolf and seer
+        #TODO - add here what happens at first day - werewolf and seer
 
-		if 
 
-		# at the start of each day, either assign a new random target
-		# or fetch a new target from the target list (agents who previously voted against us)
-		if self.current_target is None or self.player_map[self.current_target]["status"] == "DEAD":
-			
-			while len(self.target_list) > 0:
-				selected = self.target_list.pop(0)
-				if self.player_map[selected]["status"] != "DEAD":
-					print("Selected new target from target_list, ID: "+str(selected))
-					self.setTarget(selected, True)
-					break
-			# if there are no agents in the target list or they are already dead,
-			# target a new random agent
-			else:
-				selected = randomPlayerId(self.base_info)
-				print("Selecting a random target... Selected ID: "+str(selected))
-				self.setTarget(selected, False)
+        # we use a copy so that if the value of some player changes we still have the information
+        table = np.copy(self.info_table)
 
-	def talk(self):
-		print("Executing talk...")
-		
-		if self.player_map[self.current_target]["revenge"] is False: 
-			print("Voting on random target")
-		else:
-			print("Voting for revenge!")
+        #if i have someone on my black list, chose him as target
+        if len(self.black_list) > 0:
+            self.setTarget(self.black_list[0])
+        else:
+            #all the members in conflict are suspect to be werewolves
+            suspects_list = set([y for x in self.conflict_list for y in x])
+                                
+            #give the columns weights based on the identity of players (seer/medium/suspected as werewolf...)
+            for i in range(table.shape[1]):
+                if i == self.seer_id:
+                    table[:,i] = self.seer_value * table[:,i]
+                if i == self.medium_id:
+                    table[:,i] = self.medium_value * table[:,i]
+                if i == self.bg_id:
+                    table[:,i] = self.bg_value * table[:,i]
+                if i in suspects_list:
+                    table[:,i] = self.suspect_value * table[:,i]
 
-		# Talking against a target has 3 steps: (0) first estimate,
-		# then (1) state your vote, then (>2) start requesting other 
-		# agents to vote against the current target
-		if self.player_map[self.current_target]["targetStatus"] == 0: 	
-			talk = cb.estimate(self.current_target, "WEREWOLF")
-		elif self.player_map[self.current_target]["targetStatus"] == 1:
-			talk = cb.vote(self.current_target)
-		else:
-			talk = cb.request(cb.vote(self.current_target))
-			
-		self.player_map[self.current_target]["targetStatus"] += 1
-		return talk
+            #pick as target the player with lowest score
+            self.setTarget(np.argmin(np.sum(table, axis=1)) + 1)
+                
+                        
+##
+##
+##        # at the start of each day, either assign a new random target
+##        # or fetch a new target from the target list (agents who previously voted against us)
+##        if self.current_target is None or self.player_map[self.current_target]["status"] == "DEAD":
+##            
+##            while len(self.target_list) > 0:
+##                selected = self.target_list.pop(0)
+##                if self.player_map[selected]["status"] != "DEAD":
+##                    print("Selected new target from target_list, ID: "+str(selected))
+##                    self.setTarget(selected, True)
+##                    break
+##            # if there are no agents in the target list or they are already dead,
+##            # target a new random agent
+##            else:
+##                selected = randomPlayerId(self.base_info)
+##                print("Selecting a random target... Selected ID: "+str(selected))
+##                self.setTarget(selected, False)
 
-	def whisper(self):
-		print("Executing whisper...")
-		if self.current_target != None:
-			selected = self.current_target
-			print("Whispering request against current target: "+str(selected))
-		else:
-			selected = randomPlayerId(self.base_info)
-			print("Whispering request against random agent: "+str(selected))
-		return cb.request(cb.attack(selected))
+    def talk(self):
+        print("Executing talk...")
+        
+        '''
+        if self.player_map[self.current_target]["revenge"] is False: 
+            print("Voting on random target")
+        else:
+            print("Voting for revenge!")
+        '''
+            
+        # Talking against a target has 3 steps: (0) first estimate,
+        # then (1) state your vote, then (>2) start requesting other 
+        # agents to vote against the current target
+        if self.player_map[self.current_target]["targetStatus"] == 0:     
+            talk = cb.estimate(self.current_target, "WEREWOLF")
+        elif self.player_map[self.current_target]["targetStatus"] == 1:
+            talk = cb.vote(self.current_target)
+        else:
+            talk = cb.request(cb.vote(self.current_target))
+            
+        self.player_map[self.current_target]["targetStatus"] += 1
+        return talk
 
-	def vote(self):
-		print("Executing vote...")
-		if self.current_target != None:
-			selected = self.current_target
-			print("Voting on current target: "+str(selected))
-		else:
-			selected = randomPlayerId(self.base_info)
-			print("Voting on random agent: "+str(selected))
-		return selected
+    def whisper(self):
+        print("Executing whisper...")
+        if self.current_target != None:
+            selected = self.current_target
+            print("Whispering request against current target: "+str(selected))
+        else:
+            selected = randomPlayerId(self.base_info)
+            print("Whispering request against random agent: "+str(selected))
+        return cb.request(cb.attack(selected))
 
-	def attack(self):
-		print("Executing attack...")
-		if self.current_target != None:
-			selected = self.current_target
-			print("Attacking current target: "+str(selected))
-		else:
-			selected = randomPlayerId(self.base_info)
-			print("Attacking random agent: "+str(selected))
-		return selected
-		
-	def divine(self):
-		print("Executing divine randomly...")
-		return randomPlayerId(self.base_info)
+    def vote(self):
+        print("Executing vote...")
+        if self.current_target != None:
+            selected = self.current_target
+            print("Voting on current target: "+str(selected))
+        else:
+            selected = randomPlayerId(self.base_info)
+            print("Voting on random agent: "+str(selected))
+        return selected
 
-	def guard(self):
-		print("Executing guard randomly...")
-		return randomPlayerId(self.base_info)
-	
-	def finish(self):
-		print("Executing finish...")
+    def attack(self):
+        print("Executing attack...")
+        if self.current_target != None:
+            selected = self.current_target
+            print("Attacking current target: "+str(selected))
+        else:
+            selected = randomPlayerId(self.base_info)
+            print("Attacking random agent: "+str(selected))
+        return selected
+        
+    def divine(self):
+        print("Executing divine randomly...")
+        return randomPlayerId(self.base_info)
 
-	def updatePlayerMap(self, base_info):
-		if self.player_map == None:
-			self.player_map = {}
-		
-		for key, value in base_info["statusMap"].items():
-			agent_id = int(key)
-			if agent_id is not self.id:
-				if agent_id not in self.player_map:
-					self.player_map[agent_id] = {}
-					self.player_map[agent_id]["targetStatus"] = 0
-					self.player_map[agent_id]["revenge"] = False
-				self.player_map[agent_id]["status"] = value
-				self.player_map[agent_id]["whispered"] = False
+    def guard(self):
+        print("Executing guard randomly...")
+        return randomPlayerId(self.base_info)
+    
+    def finish(self):
+        print("Executing finish...")
 
-	def updateGameHistory(self, diff_data):
-		for row in diff_data.itertuples():
+    def updatePlayerMap(self, base_info):
+        for key, value in base_info["statusMap"].items():
+            agent_id = int(key)
+            if agent_id is not self.id:
+                if agent_id not in self.player_map:
+                    self.player_map[agent_id] = {}
+                    self.player_map[agent_id]["targetStatus"] = 0
+                    self.player_map[agent_id]["revenge"] = False
+                self.player_map[agent_id]["status"] = value
+                self.player_map[agent_id]["whispered"] = False
 
-                        #MEIR - not sure we need these 6 rows, since we integrate the information without using game_history
-			current_day = getattr(row, "day")
-			if current_day not in self.game_history:
-				self.game_history[current_day] = {}
+    def updateGameHistory(self, diff_data):
+        for row in diff_data.itertuples():
 
-			current_turn = getattr(row, "turn")
-			if current_turn not in self.game_history[current_day]:
-				self.game_history[current_day][current_turn] = {}
+            #MEIR - not sure we need these 6 rows, since we integrate the information without using game_history
+            current_day = getattr(row, "day")
+            if current_day not in self.game_history:
+                self.game_history[current_day] = {}
 
-			agent = getattr(row, "agent")
-			text = getattr(row, "text")
+            current_turn = getattr(row, "turn")
+            if current_turn not in self.game_history[current_day]:
+                self.game_history[current_day][current_turn] = {}
+
+            agent = getattr(row, "agent")
+            text = getattr(row, "text")
 
                         #if it's our talking, we don't need it
-			if agent == self.id:
-                                continue
+            if agent == self.id:
+                continue
 
-                        target = None
-                        target_role = None
-                        #find the target of sentence
-                        for command in ["ESTIMATE", "VOTE", "DIVINED"]:
-                                #this splitting should get the id of the target
-                                if command in text:
-                                        target = text.split(command)[1][8]
-                                        target_role = "WEREWOLF" if text.split(command)[1][11] == "W" else "VILLAGER"
+            target = None
+            target_role = None
+            #find the target of sentence
+            for command in ["ESTIMATE", "VOTE", "DIVINED"]:
+                    #this splitting should get the id of the target
+                    if command in text:
+                            target = int(text.split(command)[1][8])
+                            target_role = "WEREWOLF" if text.split(command)[1][11] == "W" else "VILLAGER"
 
-                        #this variable says whether we are unjustly targeted
-                        lie = self.id == target and self.base_info["myRole"] != target_role
+            #this variable says whether we are unjustly targeted
+            lie = self.id == target and self.base_info["myRole"] != target_role
 
-                        #we give 0.5 point for estimates - positive for "villager", negative for "werewolf"
-                        if "ESTIMATE" in text and not lie:
-                            #add to score of the target the value we accord to seer
-                            self.info_table[target][agent] += 0.5 if target_role == "VILLAGER" else -0.5
+            #we give 0.5 point for estimates - positive for "villager", negative for "werewolf"
+            if "ESTIMATE" in text and not lie:
+                #add to score of the target the value we accord to seer
+                self.info_table[target][agent] += 0.5 if target_role == "VILLAGER" else -0.5
 
-                        #we give 1 point for votes - positive for "villager", negative for "werewolf"
-                        if "VOTE" in text and not lie:
-                            #add to score of the target the value we accord to seer
-                            self.info_table[target][agent] += 1 if target_role == "VILLAGER" else -1
+            #we give 1 point for votes - positive for "villager", negative for "werewolf"
+            if "VOTE" in text and not lie:
+                #add to score of the target the value we accord to seer
+                self.info_table[target][agent] += 1 if target_role == "VILLAGER" else -1
+            
+            '''
+            Someone is pretending to be seer:
+            * if he tells about us wrong information, we know him for a werewolf
+            * if we are the seer, we know him for a werewolf
+            * if no conflict occurs, we believe him
+            * if another one says he is seer, put the two of them in conflict list and believe none
+            '''
+            if "DIVINED" in text:
+                #if i am the seer and not the talker, or if he lies about me, kill him!
+                if self.seer_id == self.id or lie:
+                    if self.seer_id == agent:
+                        self.seer_id = None
+                        self.seer_value = 2
+                        self.setTarget(agent)
+                    #if there's already a seer, and the current one contests him, put them in conflict
+                    elif self.seer_id != agent and self.seer_id != None:
+                        self.conflict_list.append([self.seer_id, agent])
+                        self.seer_id = -1
+                    else:
+                        if self.seer_id == None:
+                            self.seer_id = agent
+
+                        #add to score of the target the value we accord to seer
+                        self.info_table[target][agent] += 1 if target_role == "VILLAGER" else -1
+
+
+            # medium works like seer approximately
+            if "IDENTIFIED" in text:
+                if self.medium_id == self.id:
+                    self.setTarget(agent)
+                elif self.medium_id != agent and self.medium_id != None:
+                    self.conflict_list.append([self.medium_id, agent])
+                    self.medium_id = -1
+                else:
+                    if self.medium_id == None:
+                        self.medium_id = agent
+
+                    #add to score of the target the value we accord to seer
+                    self.info_table[target][agent] += 1 if target_role == "VILLAGER" else -1
+
+            # bodyguard works like seer approximately
+            if "GUARDED" in text:
+                if self.bg_id == self.id:
+                    self.setTarget(agent)
+                #if there are no dead
+                elif self.no_dead:
+                    #bodyguard contested    
+                    if self.bg_id != agent and self.bg_id != None:
+                        self.conflict_list.append([self.bg_id, agent])
+                        self.bg_id = -1
+                    #bodyguard not contested
+                    else:
+                        self.bg_id = agent if self.bg_id == None else self.bg_id
+                    self.info_table[target][agent] += 1
+                #there were dead during night
+                else:
+                    pass
+                    
+            '''
+            # if anyone votes, estimates, or divines on our agent
+            # we set this person as a target
+            if "{:02d}".format(self.id) in text:
+                if "ESTIMATE" in text or "VOTE" in text or ("DIVINED" in text and "WEREWOLF" in text):
+                    
+                    # if we are pursuing revenge against someone already  
+                    # add this new agent to the target list
+                    if self.player_map[self.current_target]["revenge"] == True:
+                        self.target_list.append(agent)
+                    # otherwise, set this new agent as the current target
+                    else:
+                        self.setTarget(agent, True)
+            '''
                         
-                        '''
-                        Someone is pretending to be seer:
-                        * if he tells about us wrong information, we know him for a werewolf
-                        * if we are the seer, we know him for a werewolf
-                        * if no conflict occurs, we believe him
-                        * if another one says he is seer, put the two of them in conflict list and believe none
-                        '''
-			if "DIVINED" in text:
-                            #if i am the seer and not the talker, or if he lies about me, kill him!
-                            if self.seer_id == self.id or lie:
-                                if self.seer_id == agent:
-                                    self.seer_id = None
-                                    self.seer_value = 2
-                                    setTarget(agent,1)
-                                #if there's already a seer, and the current one contests him, put them in conflict
-                                elif self.seer_id != agent and self.seer_id != None:
-                                    self.conflict_list.append([self.seer_id, agent])
-                                    self.seer_value = 1
-                                else:
-                                    if self.seer_id == None:
-                                            self.seer_id = agent
+    def setTarget(self, id):
+        self.current_target = id
+        self.player_map[id]["targetStatus"] = 0
 
-                                    #add to score of the target the value we accord to seer
-                                    self.info_table[target][agent] += seer_value if target_role == "VILLAGER" else -1*seer_value
+        # Set someone as black for the first time
+        if id not in self.black_list:
+            self.black_list.append(id)
 
+            #if we chose someone as target, it means all his info is wrong, and therefore multiplied by -1
+            # DAN: Note, we can't do this once, we have to do this multiplier every time the agent accceses the info_table values
+            #       so what this function should do isn't to multiply the values, it's to set a "multiply by -1" flag
+            self.info_table[:,id] *= -1
 
-                        # medium works like seer approximately
-			if "IDENTIFIED" in text:
-                                if self.medium_id == self.id:
-                                    setTarget(agent, 1)
-                                elif self.medium_id != agent and self.medium_id != None:
-                                    self.conflict_list.append([self.medium_id, agent])
-                                    self.medium_value = 1
-                                else:
-                                    if self.medium_id == None:
-                                            self.medium_id = agent
-
-                                    #add to score of the target the value we accord to seer
-                                    self.info_table[target][agent] += medium_value if target_role == "VILLAGER" else -1*medium_value
-
-                        # medium works like seer approximately
-			if "GUARDED" in text:
-                                if self.bg_id == self.id:
-                                        setTarget(agent, 1)
-                                #if there are no dead
-                                elif self.no_dead:
-                                    #bodyguard contested    
-                                    if self.bg_id != agent and self.bg_id != None:
-                                        self.conflict_list.append([self.bg_id, agent])
-                                        self.bg_value = 1
-                                    #bodyguard not contested
-                                    else:
-                                        self.bg_id = agent if self.bg_id == None else self.bg_id
-                                    self.info_table[target][agent] += bg_value
-                                #there were dead during night
-                                else:
-                                    pass
-
-
-
+            # if i am certain the target is werewolf, make all those in conflict with him villagers
+            for pair in self.conflict_list:
+                if id in pair:
+                    for player in pair:
+                        if player != id:
+                            self.white_list.append(player)
                         
-                        '''
-			# if anyone votes, estimates, or divines on our agent
-			# we set this person as a target
-			if "{:02d}".format(self.id) in text:
-				if "ESTIMATE" in text or "VOTE" in text or ("DIVINED" in text and "WEREWOLF" in text):
-					
-					# if we are pursuing revenge against someone already  
-					# add this new agent to the target list
-					if self.player_map[self.current_target]["revenge"] == True:
-						self.target_list.append(agent)
-					# otherwise, set this new agent as the current target
-					else:
-						self.setTarget(agent, True)
-			'''
-						
-	# Set some agent as the current target. Revenge param says 
-	# whether or not this agent acted against us before
-	def setTarget(self, id, black_list):
-		self.current_target = id
-		self.black_list.add(id)
 
-                # if i am certain the target is werewolf, make all those in conflict with him villagers
-                if black_list:
-                        for pair in conflict_list:
-                                if id in pair:
-                                        for player in pair:
-                                                if player != id:
-                                                        self.white_list.add(player)
-                                
-
-		self.player_map[id]["revenge"] = black_list
-		self.player_map[id]["targetStatus"] = 0
+##        self.player_map[id]["revenge"] = black_list
 
 
 def parseArgs(args):
-	usage = "usage: %prog [options]"
-	parser = optparse.OptionParser(usage=usage) 
+    usage = "usage: %prog [options]"
+    parser = optparse.OptionParser(usage=usage) 
 
-	# need this to ensure -h (for hostname) can be used as an option 
-	# in optparse before passing the arguments to aiwolfpy
-	parser.set_conflict_handler("resolve")
+    # need this to ensure -h (for hostname) can be used as an option 
+    # in optparse before passing the arguments to aiwolfpy
+    parser.set_conflict_handler("resolve")
 
-	parser.add_option('-h', action="store", type="string", dest="hostname",
-		help="IP address of the AIWolf server", default=None)
-	parser.add_option('-p', action="store", type="int", dest="port", 
-		help="Port to connect in the server", default=None)
-	parser.add_option('-r', action="store", type="string", dest="port", 
-		help="Role request to the server", default=-1)
-	
-	(opt, args) = parser.parse_args()
-	if opt.hostname == None or opt.port == -1:
-		parser.print_help()
-		sys.exit()
+    parser.add_option('-h', action="store", type="string", dest="hostname",
+        help="IP address of the AIWolf server", default=None)
+    parser.add_option('-p', action="store", type="int", dest="port", 
+        help="Port to connect in the server", default=None)
+    parser.add_option('-r', action="store", type="string", dest="port", 
+        help="Role request to the server", default=-1)
+    
+    (opt, args) = parser.parse_args()
+    if opt.hostname == None or opt.port == -1:
+        parser.print_help()
+        sys.exit()
 
-if __name__ == '__main__':	
-	parseArgs(sys.argv[1:])
-	aiwolfpy.connect_parse(SampleAgent("omgyousuck"))
+if __name__ == '__main__':    
+    parseArgs(sys.argv[1:])
+    aiwolfpy.connect_parse(SampleAgent("omgyousuck"))
