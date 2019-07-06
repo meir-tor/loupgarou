@@ -116,13 +116,13 @@ class SampleAgent(object):
             #give the columns weights based on the identity of players (seer/medium/suspected as werewolf...)
             for i in range(table.shape[1]):
                 if i == self.seer_id:
-                    array[:,i] = self.seer_value * array[:,i]
+                    table[:,i] = self.seer_value * table[:,i]
                 if i == self.medium_id:
-                    array[:,i] = self.medium_value * array[:,i]
+                    table[:,i] = self.medium_value * table[:,i]
                 if i == self.bg_id:
-                    array[:,i] = self.bg_value * array[:,i]
+                    table[:,i] = self.bg_value * table[:,i]
                 if i in suspects_list:
-                    array[:,i] = array[:,i] = self.suspect_value * array[:,i]
+                    table[:,i] = self.suspect_value * table[:,i]
 
             #pick as target the player with lowest score
             self.current_target = np.argmin(np.sum(table, axis=1))
