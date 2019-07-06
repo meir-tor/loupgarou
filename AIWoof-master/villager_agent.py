@@ -350,7 +350,7 @@ class SampleAgent(object):
             self.info_table[:,id] *= -1
 
             # if i am certain the target is werewolf, make all those in conflict with him villagers
-            for pair in conflict_list:
+            for pair in self.conflict_list:
                 if id in pair:
                     for player in pair:
                         if player != id:
