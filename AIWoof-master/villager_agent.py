@@ -114,12 +114,12 @@ class SampleAgent(object):
             suspects_list = set([y for x in self.conflict_list for y in x])
                                 
             #give the columns weights based on the identity of players (seer/medium/suspected as werewolf...)
-            for i in range(self.table.shape[1]):
+            for i in range(table.shape[1]):
                 if i == self.seer_id:
                     array[:,i] = self.seer_value * array[:,i]
                 if i == self.medium_id:
                     array[:,i] = self.medium_value * array[:,i]
-                if i == self.bodyguard_id:
+                if i == self.bg_id:
                     array[:,i] = self.bg_value * array[:,i]
                 if i in suspects_list:
                     array[:,i] = array[:,i] = self.suspect_value * array[:,i]
