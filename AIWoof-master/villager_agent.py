@@ -248,7 +248,7 @@ class SampleAgent(object):
             
             #find the target of sentence
             if "ESTIMATE" in text:
-                match = re.match(RE_ESIMATE, text[text.index("ESTIMATE"):])
+                match = re.match(RE_ESTIMATE, text[text.index("ESTIMATE"):])
             elif "VOTE" in text:
                 match = re.match(RE_VOTE, text[text.index("VOTE"):])
             elif "DIVINED" in text:
