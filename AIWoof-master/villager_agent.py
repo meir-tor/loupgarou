@@ -17,8 +17,10 @@ import random
 import optparse
 import numpy as np
 import sys
+import re
 
 from utility import *
+from parsing import *
 
 class SampleAgent(object):
 
@@ -243,16 +245,30 @@ class SampleAgent(object):
 
             target = None
             target_role = None
+            
             #find the target of sentence
-            for command in ["ESTIMATE", "VOTE", "DIVINED"]:
-                    #this splitting should get the id of the target
-                    if command in text:
-                            target = int(text.split(command)[1][8])
-                            target_role = "WEREWOLF" if text.split(command)[1][11] == "W" else "VILLAGER"
-
-            #this variable says whether we are unjustly targeted
-            lie = self.id == target and self.base_info["myRole"] != target_role
-
+            if "ESTIMATE" in text:
+                match = re.match(RE_ESIMATE, text[text.index("ESTIMATE"):])
+            elif "VOTE" in text:
+                match = re.match(RE_VOTE, text[text.index("VOTE"):])
+            elif "DIVINED" in text:
+                match = re.match(RE_DIVINED, text[text.index("DIVINED"):])
+            else:
+                continue
+            
+            target_role = match.group("role") if "role" in match.groupdict() else None
+            target = match.group("target")
+            
+            if target != "ANY":
+                # this variable says whether we are unjustly targeted
+                if "ESTIMATE" in text or "DIVINED" in text:
+                    # Check if we're being accused of a role we are not
+                    lie = (re.match(RE_AGENT_GROUP, target).group("id") == self.id and
+                        self.base_info["myRole"] != target_role)
+                elif "VOTE" in text:
+                    # Check if we're being voted
+                    lie = re.match(RE_AGENT_GROUP, target).group("id") == self.id
+                        
             #we give 0.5 point for estimates - positive for "villager", negative for "werewolf"
             if "ESTIMATE" in text and not lie:
                 #add to score of the target the value we accord to seer

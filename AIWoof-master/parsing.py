@@ -1,5 +1,6 @@
 
-RE_AGENT        = '(Agent\[(?P<id>\d\d\)])'
+RE_AGENT_GROUP  = '(Agent\[(?P<id>\d\d)\])'
+RE_AGENT        = '(Agent\[\d\d\])'
 
 RE_SUBJECT      = '(?P<subject>{RE_AGENT}|ANY)'.format(**locals()) # Can be omitted
 RE_TARGET       = '(?P<target>{RE_AGENT}|ANY)'.format(**locals())
