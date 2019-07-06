@@ -262,7 +262,7 @@ class SampleAgent(object):
             
             target_role = match.group("role") if "role" in match.groupdict() else None
             target = match.group("target")
-            target_id = int(re.match(RE_AGENT_GROUP, target).group("id"))
+            target_id = int(re.match(RE_AGENT_GROUP, target).group("id")) - 1
             
             if target != "ANY":
                 # this variable says whether we are unjustly targeted
