@@ -4,7 +4,7 @@ import zipfile
 
 # Collect .py files
 matches = []
-for root, dirnames, filenames in os.walk('AIWoof-master'):
+for root, dirnames, filenames in os.walk('loupgarou'):
     for filename in fnmatch.filter(filenames, '*.py'):
         matches.append(os.path.join(root, filename))
         

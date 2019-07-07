@@ -176,7 +176,7 @@ class SampleAgent(object):
 
         #those in white_list are considered as probably villagers
         for i in self.white_list:
-            scores[i] += 3
+            scores[i] *= 1.4
 
         #if we are seer, we check for the player of which we have the least info
         if isSeer:
