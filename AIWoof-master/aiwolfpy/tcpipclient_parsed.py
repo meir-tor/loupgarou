@@ -24,7 +24,7 @@ def connect_parse(agent):
     aiwolf_host = input_args.hostname
     aiwolf_port = input_args.port
     aiwolf_role = input_args.role
-    aiwolf_role = "WEREWOLF"
+    aiwolf_role = "SEER"
     # socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # connect
