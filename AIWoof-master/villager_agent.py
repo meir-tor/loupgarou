@@ -28,7 +28,7 @@ class SampleAgent(object):
         self.myname = agent_name
 
     def initialize(self, base_info, diff_data, game_setting):
-        self.id = base_info["agentIdx"]
+        self.id = base_info["agentIdx"] - 1
         self.base_info = base_info
         self.game_setting = game_setting
 
@@ -179,7 +179,6 @@ class SampleAgent(object):
             scores = np.absolute(scores)
 
         # avoid voting for myself
-        #TODO - confirm that self.id - 1 is indeed my id
         scores[self.id - 1] = np.max(scores) + 1
 
         return np.argmin(scores) + 1
@@ -295,7 +294,7 @@ class SampleAgent(object):
         '''
         checked_pairs = []
         for row in reversed(list(diff_data.itertuples())):
-            agent = getattr(row, "agent")
+            agent = getattr(row, "agent") - 1
             text = getattr(row, "text")
 
             #if it's our talking, we don't need to analyze it
