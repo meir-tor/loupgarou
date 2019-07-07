@@ -221,9 +221,11 @@ class SampleAgent(object):
         #if i am seer/medium and i know most of werewolves - tell the world i know the werewolves as seer
         if self.seer_id == self.id or self.medium_id == self.id:
             werewolves = [x for x in self.divine_map if self.divine_map[x] == "WEREWOLF"]
-
+            
             #if we know more than half of the werewolves, reveal one of them
             if len(werewolves) >= 0.5 * self.ww_number:
+                if p < 0.3 and self.villagers_list:
+                    return cb.divined(random.choice(self.villagers_list), "VILLAGER")
                 living_ww = [x for x in werewolves if self.base_info["statusMap"][str(x+1)] == "ALIVE"]
                 if len(living_ww) > 0:
                     return cb.divined(random.choice(living_ww), "WEREWOLF")
