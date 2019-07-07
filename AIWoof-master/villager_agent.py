@@ -100,6 +100,8 @@ class SampleAgent(object):
         self.updatePlayerMap(base_info)
         self.pickTarget()
 
+
+    #picks a target based on black list and the table heuristics
     def pickTarget(self):
         print("Executing pickTarget...")
         
@@ -110,7 +112,6 @@ class SampleAgent(object):
         living_wws = [w for w in self.black_list if self.base_info["statusMap"][str(w)] == "ALIVE"]
         if len(living_wws) > 0:
             self.setTarget(living_wws[0])
-            return
         else:
             #all the members in conflict are suspect to be werewolves
             suspects_list = set([y for x in self.conflict_list for y in x])
@@ -131,8 +132,6 @@ class SampleAgent(object):
 
             #pick as target the player with lowest score
             self.setTarget(np.argmin(np.sum(table, axis=1)) + 1)
-
-
 
     def dayStart(self):
         print("Executing dayStart...")
@@ -217,21 +216,17 @@ class SampleAgent(object):
                 self.player_map[agent_id]["whispered"] = False
 
     def updateGameHistory(self, diff_data):
-        for row in diff_data.itertuples():
-
-            #MEIR - not sure we need these 6 rows, since we integrate the information without using game_history
-            current_day = getattr(row, "day")
-            if current_day not in self.game_history:
-                self.game_history[current_day] = {}
-
-            current_turn = getattr(row, "turn")
-            if current_turn not in self.game_history[current_day]:
-                self.game_history[current_day][current_turn] = {}
-
+        '''
+        if a player changes his mind about someone during talk, we need to know that.
+        Therefore, we scan the talks in reversed order, and keep only the last opinion
+        '''
+        checked_pairs = []
+        for row in reversed(list(diff_data.itertuples())):
+            print(row, "AAAAAAA")
             agent = getattr(row, "agent")
             text = getattr(row, "text")
 
-                        #if it's our talking, we don't need it
+            #if it's our talking, we don't need to analyze it
             if agent == self.id:
                 continue
 
@@ -260,7 +255,15 @@ class SampleAgent(object):
             target_role = match.group("role") if "role" in match.groupdict() else None
             target = match.group("target")
             target_id = int(re.match(RE_AGENT_GROUP, target).group("id")) - 1
-            
+
+            #if we already saw the last things the agent had to say about the target,
+            # no need to read previous talks
+            if [agent, target_id] in checked_pairs:
+                continue
+            #if this is the 'last word' of the agent about the target, keep processing it
+            else:
+                checked_pairs.append([agent, target_id])
+
             if target != "ANY":
                 # this variable says whether we are unjustly targeted
                 if "ESTIMATE" in text or "DIVINED" in text:
@@ -295,8 +298,6 @@ class SampleAgent(object):
                         self.seer_id = None
                         self.seer_value = 2
                     self.black_list.append(agent)
-                    #TODO = verify if we set target
-                    self.setTarget(agent)
                 #if there's already a seer, and the current one contests him, put them in conflict
                 elif self.seer_id != agent and self.seer_id != None:
                     self.conflict_list.append([self.seer_id, agent])
@@ -314,8 +315,6 @@ class SampleAgent(object):
             elif "IDENTIFIED" in text:
                 if self.medium_id == self.id:
                     self.black_list.append(agent)
-                    #TODO = verify if we set target
-                    self.setTarget(agent)
                 elif self.medium_id != agent and self.medium_id != None:
                     self.conflict_list.append([self.medium_id, agent])
                     self.medium_value = 1
@@ -331,8 +330,6 @@ class SampleAgent(object):
             elif "GUARDED" in text:
                 if self.bg_id == self.id:
                     self.black_list.append(agent)
-                    #TODO = verify if we set target
-                    self.setTarget(agent)
                 #if there are no dead
                 elif self.no_dead:
                     #bodyguard contested    
@@ -347,45 +344,41 @@ class SampleAgent(object):
                 else:
                     pass
                 self.info_table[target_id][agent] += 1
-                    
-            '''
-            # if anyone votes, estimates, or divines on our agent
-            # we set this person as a target
-            if "{:02d}".format(self.id) in text:
-                if "ESTIMATE" in text or "VOTE" in text or ("DIVINED" in text and "WEREWOLF" in text):
-                    
-                    # if we are pursuing revenge against someone already  
-                    # add this new agent to the target list
-                    if self.player_map[self.current_target]["revenge"] == True:
-                        self.target_list.append(agent)
-                    # otherwise, set this new agent as the current target
-                    else:
-                        self.setTarget(agent, True)
-            '''
-                        
+            
+            num_conflicts = len(self.conflict_list)
+            new_num_conflicts = len(self.conflict_list)
+
+            #update conflicts while you can
+            while(num_conflicts != new_num_conflicts):
+                num_conflicts = len(self.conflict_list)
+                self.updateConflicts()
+                new_num_conflicts = len(self.conflict_list)
+
+    #find conflicts that can be resolved and erase them
+    def updateConflicts():
+        #identify all those in conflict with werewolves as villagers
+        for ww in self.black_list:
+            for pair in self.conflict_list:
+                if ww in pair:
+                    for player in pair:
+                        if player != ww:
+                            self.white_list.append(player)
+                self.conflict_list.remove(pair)
+
+        #identify all those in conflict with villagers as werewolves
+        for vlg in self.white_list:
+            for pair in self.conflict_list:
+                if vlg in pair:
+                    for player in pair:
+                        if player != vlg:
+                            self.black_list.append(player)
+                self.conflict_list.remove(pair)        
+            
+            
+                               
     def setTarget(self, id):
         self.current_target = id
-        self.player_map[id]["targetStatus"] = 0
-
-        # Set someone as black for the first time
-        if id not in self.black_list:
-            self.black_list.append(id)
-
-            #if we chose someone as target, it means all his info is wrong, and therefore multiplied by -1
-            # DAN: Note, we can't do this once, we have to do this multiplier every time the agent accceses the info_table values
-            #       so what this function should do isn't to multiply the values, it's to set a "multiply by -1" flag
-            #self.info_table[:,id] *= -1
-
-            # if i am certain the target is werewolf, make all those in conflict with him villagers
-            for pair in self.conflict_list:
-                if id in pair:
-                    for player in pair:
-                        if player != id:
-                            self.white_list.append(player)
-                        
-
-##        self.player_map[id]["revenge"] = black_list
-
+#        self.player_map[id]["targetStatus"] = 0
 
 def parseArgs(args):
     usage = "usage: %prog [options]"
