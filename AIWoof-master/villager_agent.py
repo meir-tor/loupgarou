@@ -13,6 +13,7 @@ import time
 import aiwolfpy
 import aiwolfpy.contentbuilder as cb
 
+
 import random
 import optparse
 import numpy as np
@@ -86,7 +87,7 @@ class SampleAgent(object):
         #MEIR - this variable will be used to test the claim of bodyguard
         self.no_dead = False
 
-        if self.seer_id:
+        if self.seer_id or self.medium_id:
             self.villager_list = []
 
         printGameSetting(game_setting)
@@ -103,7 +104,6 @@ class SampleAgent(object):
         new_living = len([v for v in base_info["statusMap"] if v == "ALIVE"])
         
         self.base_info = base_info
-
 
 
         if living == new_living:
@@ -256,6 +256,7 @@ class SampleAgent(object):
         print("Executing divine...")
 
         target = self.minimal_score(isSeer=True)
+        
         return target
 
     def guard(self):
@@ -298,7 +299,8 @@ class SampleAgent(object):
             agent = getattr(row, "agent") - 1
             text = getattr(row, "text")
             talk_type = getattr(row, "type")
-            
+
+            #SEER updates his werewolves and villagers' lists, based on the divine info
             if talk_type == "divine":
                 match = re.match(RE_DIVINED, text)
                 
@@ -309,7 +311,23 @@ class SampleAgent(object):
                 self.divine_map[target_id] = target_role
                 
                 if target_role == "VILLAGER":
-                    self.white_list.append(target_id)
+                    self.villager_list.append(target_id)
+                else:
+                    self.black_list.append(target_id)
+                continue
+
+            #MEDIUM updates his werewolves and villagers' lists, based on the divine info
+            if talk_type == "identify":
+                match = re.match(RE_IDENTIFIED, text)
+                
+                target_role = match.group("species")
+                target = match.group("target")
+                target_id = int(re.match(RE_AGENT_GROUP, target).group("id")) - 1
+
+                self.divine_map[target_id] = target_role
+                
+                if target_role == "VILLAGER":
+                    self.villager_list.append(target_id)
                 else:
                     self.black_list.append(target_id)
                 continue
