@@ -235,7 +235,7 @@ class SampleAgent(object):
                     pass
 
         # if no one is dead during night, reveal myself as bodyguard
-        if self.bg_id == self.id and self.no_dead:
+        if self.bg_id == self.id and self.no_dead and hasattr(self, 'guarded'):
             return cb.guarded(self.guarded)
             
         #if we're not sure our target is a werewolf - estimate
@@ -282,12 +282,13 @@ class SampleAgent(object):
             self.guarded = self.seer_id
 
         # if there's an uncontested medium, protect him
-        if self.medium_id not in [None, -1]:
+        elif self.medium_id not in [None, -1]:
             self.guarded = self.medium_id
-
-        self.guarded = self.id
         
-        #protect myself
+        else:
+            # protect myself
+            self.guarded = self.id
+        
         return self.guarded
     
     def finish(self):
