@@ -146,7 +146,7 @@ class SampleAgent(object):
             #calculate the difference between estimation of a player and the reality 
             for i in range(self.num_players):
                 if self.true_table_role[i] == -100:
-                    continue
+                    wolfscore[i] = np.inf
                 else:
                     for j in range(self.num_players):
                         wolfscore[i] += np.abs(self.true_table_role[j] - table[j][i])
@@ -254,33 +254,22 @@ class SampleAgent(object):
 
     def whisper(self):
         print("Executing whisper...")
-            
-        if self.current_target != None:
-            selected = self.current_target
-            print("Whispering request against current target: "+str(selected))
-        else:
-            selected = randomPlayerId(self.base_info)
-            print("Whispering request against random agent: "+str(selected))
+        selected = self.current_target
+        print("Whispering request against current target: "+str(selected))
         return cb.request(cb.attack(selected))
-
+    
     def vote(self):
         return self.current_target
 
     def attack(self):
         print("Executing attack...")
-        if self.current_target != None:
-            selected = self.current_target
-            print("Attacking current target: "+str(selected))
-        else:
-            selected = randomPlayerId(self.base_info)
-            print("Attacking random agent: "+str(selected))
+        selected = self.current_target
+        print("Attacking current target: "+str(selected)) 
         return selected
-        
+    
     def divine(self):
         print("Executing divine...")
-
         target = self.minimal_score(isSeer=True)
-        
         return target
 
     def guard(self):
