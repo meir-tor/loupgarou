@@ -83,7 +83,7 @@ class SampleAgent(object):
         #if one is believed to be BODYGUARD, his word is worth more - since he proved it
         self.seer_value = 2
         self.medium_value = 2
-        self.bg_value = 5
+        self.bg_value = 1.5
         self.suspect_value = 0.2
 
         # this variable will be used to test the claim of bodyguard
