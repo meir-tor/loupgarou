@@ -71,6 +71,9 @@ class SampleAgent(object):
         #MEIR - this variable will be used to test the claim of bodyguard
         self.no_dead = False
 
+        if self.seer_id:
+            self.villager_list = []
+
         printGameSetting(game_setting)
         self.updatePlayerMap(base_info)
 
@@ -105,40 +108,49 @@ class SampleAgent(object):
     def pickTarget(self):
         print("Executing pickTarget...")
         
-        # we use a copy so that if the value of some player changes we still have the information
-        table = np.copy(self.info_table)
-
         #if i have someone on my black list, choose him as target
         living_wws = [w for w in self.black_list if self.base_info["statusMap"][str(w)] == "ALIVE"]
         if len(living_wws) > 0:
             self.setTarget(living_wws[0])
         else:
-            #all the members in conflict are suspect to be werewolves
-            suspects_list = set([y for x in self.conflict_list for y in x])
-                                
-            #give the columns weights based on the identity of players (seer/medium/suspected as werewolf...)
-            for i in range(table.shape[1]):
-                if i == self.seer_id:
-                    table[:,i] = self.seer_value * table[:,i]
-                if i == self.medium_id:
-                    table[:,i] = self.medium_value * table[:,i]
-                if i == self.bg_id:
-                    table[:,i] = self.bg_value * table[:,i]
-                if i in self.black_list:
-                    table[:,i] = -1 * table[:,i]
-                    continue
-                if i in suspects_list:
-                    table[:,i] = self.suspect_value * table[:,i]
-
-            #pick as target the player with lowest score
-            scores = np.sum(table, axis=1)
-
-            #those in white_list are considered as probably villagers
-            for i in self.white_list:
-                scores[i] += 3
-
-            self.setTarget(np.argmin(scores) + 1)
+            self.setTarget(self.minimal_score())
                 
+
+    def minimal_score(self, isSeer=False):
+
+        # we use a copy so that if the value of some player changes we still have the information
+        table = np.copy(self.info_table)
+
+        #all the members in conflict are suspect to be werewolves
+        suspects_list = set([y for x in self.conflict_list for y in x])
+                            
+        #give the columns weights based on the identity of players (seer/medium/suspected as werewolf...)
+        for i in range(table.shape[1]):
+            if i == self.seer_id:
+                table[:,i] = self.seer_value * table[:,i]
+            if i == self.medium_id:
+                table[:,i] = self.medium_value * table[:,i]
+            if i == self.bg_id:
+                table[:,i] = self.bg_value * table[:,i]
+            if i in self.black_list:
+                table[:,i] = -1 * table[:,i]
+                continue
+            if i in suspects_list:
+                table[:,i] = self.suspect_value * table[:,i]
+
+        #pick as target the player with lowest score
+        scores = np.sum(table, axis=1)
+
+        #those in white_list are considered as probably villagers
+        for i in self.white_list:
+            scores[i] += 3
+
+        #if we are seer, we check for the player of which we have the least info
+        if isSeer:
+            scores = np.absolute(scores)
+
+        return np.argmin(scores) + 1
+
 
     def dayStart(self):
         print("Executing dayStart...")
@@ -192,8 +204,10 @@ class SampleAgent(object):
         return selected
         
     def divine(self):
-        print("Executing divine randomly...")
-        return randomPlayerId(self.base_info)
+        print("Executing divine...")
+
+        target = self.minimal_score(isSeer=True)
+        return target
 
     def guard(self):
         print("Executing guard randomly...")
