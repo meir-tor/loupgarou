@@ -151,6 +151,7 @@ class SampleAgent(object):
             scores = np.absolute(scores)
 
         # avoid voting for myself
+        #TODO - confirm that self.id - 1 is indeed my id
         scores[self.id - 1] = np.max(scores) + 1
 
         return np.argmin(scores) + 1
@@ -219,7 +220,19 @@ class SampleAgent(object):
 
     def guard(self):
         print("Executing guard randomly...")
-        return randomPlayerId(self.base_info)
+
+        # if there's an uncontested seer, protect him
+        if self.seer_id not in [None, -1]:
+            return self.seer_id
+
+        # if there's an uncontested medium, protect him
+        if self.medium_id not in [None, -1]:
+            return self.medium_id
+
+        #TODO - maybe add some heuristic for villagers...
+        
+        #protect myself
+        return self.id
     
     def finish(self):
         print("Executing finish...")
