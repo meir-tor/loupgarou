@@ -224,8 +224,8 @@ class SampleAgent(object):
             
             #if we know more than half of the werewolves, reveal one of them
             if len(werewolves) >= 0.5 * self.ww_number:
-                if p < 0.3 and self.villagers_list:
-                    return cb.divined(random.choice(self.villagers_list), "VILLAGER")
+                if p < 0.3 and len(self.villager_list) > 0:
+                    return cb.divined(random.choice(self.villager_list), "VILLAGER")
                 living_ww = [x for x in werewolves if self.base_info["statusMap"][str(x+1)] == "ALIVE"]
                 if len(living_ww) > 0:
                     return cb.divined(random.choice(living_ww), "WEREWOLF")
