@@ -131,7 +131,14 @@ class SampleAgent(object):
                     table[:,i] = self.suspect_value * table[:,i]
 
             #pick as target the player with lowest score
-            self.setTarget(np.argmin(np.sum(table, axis=1)) + 1)
+            scores = np.sum(table, axis=1)
+
+            #those in white_list are considered as probably villagers
+            for i in self.white_list:
+                scores[i] += 3
+
+            self.setTarget(np.argmin(scores) + 1)
+                
 
     def dayStart(self):
         print("Executing dayStart...")
@@ -142,25 +149,16 @@ class SampleAgent(object):
 
     def talk(self):
         print("Executing talk...")
-        
-        '''
-        if self.player_map[self.current_target]["revenge"] is False: 
-            print("Voting on random target")
-        else:
-            print("Voting for revenge!")
-        '''
-            
-        # Talking against a target has 3 steps: (0) first estimate,
-        # then (1) state your vote, then (>2) start requesting other 
-        # agents to vote against the current target
-        if self.player_map[self.current_target]["targetStatus"] == 0:     
+
+        #TODO - maybe talk of villagers?
+
+        #if we're not sure our target is a werewolf - estimate
+        if not self.current_target in self.black_list:     
             talk = cb.estimate(self.current_target, "WEREWOLF")
-        elif self.player_map[self.current_target]["targetStatus"] == 1:
-            talk = cb.vote(self.current_target)
+        #if we're sure - comingout
         else:
-            talk = cb.request(cb.vote(self.current_target))
-            
-        self.player_map[self.current_target]["targetStatus"] += 1
+            talk = cb.comingout(self.current_target, "WEREWOLF")
+
         return talk
 
     def whisper(self):
@@ -174,14 +172,14 @@ class SampleAgent(object):
         return cb.request(cb.attack(selected))
 
     def vote(self):
-        print("Executing vote...")
-        if self.current_target != None:
-            selected = self.current_target
-            print("Voting on current target: "+str(selected))
-        else:
-            selected = randomPlayerId(self.base_info)
-            print("Voting on random agent: "+str(selected))
-        return selected
+##        print("Executing vote...")
+##        if self.current_target != None:
+##            selected = self.current_target
+##            print("Voting on current target: "+str(selected))
+##        else:
+##            selected = randomPlayerId(self.base_info)
+##            print("Voting on random agent: "+str(selected))
+        return self.current_target
 
     def attack(self):
         print("Executing attack...")
@@ -345,17 +343,10 @@ class SampleAgent(object):
                     pass
                 self.info_table[target_id][agent] += 1
             
-            num_conflicts = len(self.conflict_list)
-            new_num_conflicts = len(self.conflict_list)
-
-            #update conflicts while you can
-            while(num_conflicts != new_num_conflicts):
-                num_conflicts = len(self.conflict_list)
-                self.updateConflicts()
-                new_num_conflicts = len(self.conflict_list)
+        self.updateConflicts()
 
     #find conflicts that can be resolved and erase them
-    def updateConflicts():
+    def updateConflicts(self):
         #identify all those in conflict with werewolves as villagers
         for ww in self.black_list:
             for pair in self.conflict_list:
@@ -363,22 +354,12 @@ class SampleAgent(object):
                     for player in pair:
                         if player != ww:
                             self.white_list.append(player)
-                self.conflict_list.remove(pair)
-
-        #identify all those in conflict with villagers as werewolves
-        for vlg in self.white_list:
-            for pair in self.conflict_list:
-                if vlg in pair:
-                    for player in pair:
-                        if player != vlg:
-                            self.black_list.append(player)
                 self.conflict_list.remove(pair)        
             
             
                                
     def setTarget(self, id):
         self.current_target = id
-#        self.player_map[id]["targetStatus"] = 0
 
 def parseArgs(args):
     usage = "usage: %prog [options]"
