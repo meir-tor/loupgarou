@@ -145,9 +145,13 @@ class SampleAgent(object):
         for i in self.white_list:
             scores[i] += 3
 
+
         #if we are seer, we check for the player of which we have the least info
         if isSeer:
             scores = np.absolute(scores)
+
+        # avoid voting for myself
+        scores[self.id - 1] = np.max(scores) + 1
 
         return np.argmin(scores) + 1
 
@@ -156,13 +160,22 @@ class SampleAgent(object):
         print("Executing dayStart...")
 
         #TODO - add here what happens at first day - werewolf and seer
-
         self.pickTarget()
 
     def talk(self):
         print("Executing talk...")
 
         #TODO - maybe talk of villagers?
+
+        #if i am seer and i know most of werewolves - tell the world i know the werewolves as seer
+        if self.seer_id == self.id:
+            werewolves = [x for x in self.base_info["roleMap"] if self.base_info["roleMap"][x] == "WEREWOLF"]
+
+            #if we know more than half of the werewolves, reveal one of them
+            if len(werewolves) >= 0.5 * self.ww_number:
+                living_ww = [x for x in werewolves if self.base_info["statusMap"][x] == "ALIVE"]
+                if living_ww:
+                    return cb.divined(random.choice(living_ww, "WEREWOLF"))
 
         #if we're not sure our target is a werewolf - estimate
         if not self.current_target in self.black_list:     
@@ -175,6 +188,7 @@ class SampleAgent(object):
 
     def whisper(self):
         print("Executing whisper...")
+            
         if self.current_target != None:
             selected = self.current_target
             print("Whispering request against current target: "+str(selected))
@@ -184,13 +198,6 @@ class SampleAgent(object):
         return cb.request(cb.attack(selected))
 
     def vote(self):
-##        print("Executing vote...")
-##        if self.current_target != None:
-##            selected = self.current_target
-##            print("Voting on current target: "+str(selected))
-##        else:
-##            selected = randomPlayerId(self.base_info)
-##            print("Voting on random agent: "+str(selected))
         return self.current_target
 
     def attack(self):
@@ -206,7 +213,8 @@ class SampleAgent(object):
     def divine(self):
         print("Executing divine...")
 
-        target = self.minimal_score(isSeer=True)
+        #TODO - understand where is the information from divination received
+        target = self.minimal_score(isSeer=True)        
         return target
 
     def guard(self):
