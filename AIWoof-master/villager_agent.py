@@ -43,9 +43,22 @@ class SampleAgent(object):
         and the lines are the players - the sum of each line is a score - positive for villager, negative for werewolf.
         '''
         num_players = game_setting["playerNum"]
+        self.num_players = num_players
+        
+        self.my_role = base_info["myRole"]
         
         self.info_table = np.zeros([num_players,num_players])
 
+        # table of true role for werewoolf :  villager = +100 , wol = -100
+        self.true_table_role = np.zeros(num_players)
+        for i in range(len(base_info["roleMap"])):
+            role_map_idx = str(i+1)
+            if role_map_idx in base_info:
+                if base_info["roleMap"][role_map_idx] == "WEREWOLF":
+                    self.true_table_role[i] = -100
+            else:
+                self.true_table_role[i] = 100
+        
         #number of werewolves
         self.ww_number = game_setting["roleNumMap"]["WEREWOLF"]
 
@@ -108,19 +121,35 @@ class SampleAgent(object):
     def pickTarget(self):
         print("Executing pickTarget...")
         
-        #if i have someone on my black list, choose him as target
-        living_wws = [w for w in self.black_list if self.base_info["statusMap"][str(w)] == "ALIVE"]
-        if len(living_wws) > 0:
-            self.setTarget(living_wws[0])
+        if self.my_role == "WEREWOLF":
+            self.setTarget(self.minimal_score(isWerewolf=True))
         else:
-            self.setTarget(self.minimal_score())
+            #if i have someone on my black list, choose him as target
+            living_wws = [w for w in self.black_list if self.base_info["statusMap"][str(w)] == "ALIVE"]
+            if len(living_wws) > 0:
+                self.setTarget(living_wws[0])
+            else:
+                self.setTarget(self.minimal_score())
                 
 
-    def minimal_score(self, isSeer=False):
+    def minimal_score(self, isSeer=False, isWerewolf=False):
 
         # we use a copy so that if the value of some player changes we still have the information
         table = np.copy(self.info_table)
-
+        
+        if isWerewolf:
+            wolfscore = np.zeros(self.num_players)
+            #calculate the difference between estimation of a player and the reality 
+            for i in range(self.num_players):
+                if self.true_table_role[i] == -100:
+                    continue
+                else:
+                    for j in range(self.num_players):
+                        wolfscore[i] += np.abs(self.true_table_role[j] - table[j][i])
+            
+            
+            return np.argmin(wolfscore) + 1
+        
         #all the members in conflict are suspect to be werewolves
         suspects_list = set([y for x in self.conflict_list for y in x])
                             
@@ -145,7 +174,6 @@ class SampleAgent(object):
         for i in self.white_list:
             scores[i] += 3
 
-
         #if we are seer, we check for the player of which we have the least info
         if isSeer:
             scores = np.absolute(scores)
@@ -167,6 +195,18 @@ class SampleAgent(object):
         print("Executing talk...")
 
         #TODO - maybe talk of villagers?
+        
+        if self.my_role == "WEREWOLF":
+            #with proba , estimate our target as wolf ,with proba q comingout target as wolf, 1-p-q skip talking 
+            p = np.random.uniform()
+            if p < .35:     
+                talk = cb.estimate(self.current_target, "WEREWOLF")
+            #if we're sure - comingout
+            elif p > .6:
+                talk = cb.comingout(self.current_target, "WEREWOLF")
+            else: #skip
+                talk = cb.skip()
+            return talk
 
         #if i am seer and i know most of werewolves - tell the world i know the werewolves as seer
         if self.seer_id == self.id:
