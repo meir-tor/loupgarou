@@ -33,8 +33,6 @@ class SampleAgent(object):
         self.base_info = base_info
         self.game_setting = game_setting
 
-        self.game_history = {} # stores each sentence stated from each day
-        self.player_map = {}   # a map with the status and other info for each player
         self.target_list = []  # a queue storing possible targets to act against
         self.current_target = None
         
@@ -67,7 +65,11 @@ class SampleAgent(object):
 
         #conflict_list for pairs of players of which one is certainly a werewolf.
         self.conflict_list = []
+
+        #the white list is a list of players considered (not 100%) to be villagers
         self.white_list = []
+
+        #the black list is a list of players known to be werewolves (by seeing or 'logic' deduction)
         self.black_list = []
 
         #ids of seer, medium, and bodyguard, None if unknown
@@ -76,7 +78,7 @@ class SampleAgent(object):
         self.bg_id = None if base_info["myRole"] != "BODYGUARD" else self.id
 
         # MEIR - these constants will be multiplied with the 'value' of information
-        # if one is suspect of being WEREWOLF, we treat his info less,
+        # if one is suspect of being WEREWOLF, we treat his info as less valuable,
         #if one is believed to be SEER or MEDIUM, his word is worth more
         #if one is believed to be BODYGUARD, his word is worth more - since he proved it
         self.seer_value = 2
@@ -84,14 +86,14 @@ class SampleAgent(object):
         self.bg_value = 5
         self.suspect_value = 0.2
 
-        #MEIR - this variable will be used to test the claim of bodyguard
+        # this variable will be used to test the claim of bodyguard
         self.no_dead = False
 
+        # the seer and medium keep a list of certain villagers (known by their abilities)
         if self.seer_id or self.medium_id:
             self.villager_list = []
 
         printGameSetting(game_setting)
-        self.updatePlayerMap(base_info)
 
     def getName(self):
         return self.myname
@@ -99,23 +101,23 @@ class SampleAgent(object):
     def update(self, base_info, diff_data, request):
         print("Executing update...")
 
-        #check whether someone died
-        living = len([v for v in self.base_info["statusMap"] if v == "ALIVE"])
-        new_living = len([v for v in base_info["statusMap"] if v == "ALIVE"])
+        # if a day starts, check whether someone died this night
+        if request == 'DAILY_INITIALIZE':
+            #check whether someone died
+            living = len([v for v in self.base_info["statusMap"] if v == "ALIVE"])
+            new_living = len([v for v in base_info["statusMap"] if v == "ALIVE"])
         
+            if living == new_living:
+                self.no_dead = True
+            else:
+                self.no_dead = False
+
         self.base_info = base_info
-
-
-        if living == new_living:
-            self.no_dead = True
-        else:
-            self.no_dead = False
         
         printBaseInfo(base_info)
         printDiffData(diff_data)
         
         self.updateGameHistory(diff_data)
-        self.updatePlayerMap(base_info)
         self.pickTarget()
 
 
@@ -180,6 +182,14 @@ class SampleAgent(object):
         if isSeer:
             scores = np.absolute(scores)
 
+        #the possessed inverses the information of other villagers - tries to kill villagers
+        if self.base_info["myRole"] == "POSSESSED":
+            # avoid voting for myself
+            scores[self.id - 1] = np.min(scores) - 1
+
+            return np.argmax(scores) + 1
+
+
         # avoid voting for myself
         scores[self.id - 1] = np.max(scores) + 1
 
@@ -187,19 +197,18 @@ class SampleAgent(object):
 
 
     def dayStart(self):
-        print("Executing dayStart...")
 
-        #TODO - add here what happens at first day - werewolf and seer
+        print("Executing dayStart...")
         self.pickTarget()
 
     def talk(self):
         print("Executing talk...")
 
-        #TODO - maybe talk of villagers?
+        #the probability will be used to return different talks
+        p = np.random.uniform()
         
         if self.my_role == "WEREWOLF":
             #with proba , estimate our target as wolf ,with proba q comingout target as wolf, 1-p-q skip talking 
-            p = np.random.uniform()
             if p < .35:     
                 talk = cb.estimate(self.current_target, "WEREWOLF")
             #if we're sure - comingout
@@ -209,22 +218,37 @@ class SampleAgent(object):
                 talk = cb.skip()
             return talk
 
-        #if i am seer and i know most of werewolves - tell the world i know the werewolves as seer
-        if self.seer_id == self.id:
+        #if i am seer/medium and i know most of werewolves - tell the world i know the werewolves as seer
+        if self.seer_id == self.id or self.medium_id == self.id:
             werewolves = [x for x in self.divine_map if self.divine_map[x] == "WEREWOLF"]
 
             #if we know more than half of the werewolves, reveal one of them
             if len(werewolves) >= 0.5 * self.ww_number:
                 living_ww = [x for x in werewolves if self.base_info["statusMap"][str(x+1)] == "ALIVE"]
                 if len(living_ww) > 0:
-                    return cb.divined(random.choice(living_ww, "WEREWOLF"))
+                    return cb.divined(random.choice(living_ww), "WEREWOLF")
+                elif self.medium_id == self.id:
+                    return cb.identified(random.choice(werewolves), "WEREWOLF")
+                else:
+                    pass
 
+        # if no one is dead during night, reveal myself as bodyguard
+        if self.bg_id == self.id and self.no_dead:
+            return cb.guarded(self.guarded)
+            
         #if we're not sure our target is a werewolf - estimate
-        if not self.current_target in self.black_list:     
-            talk = cb.estimate(self.current_target, "WEREWOLF")
-        #if we're sure - comingout
+        if p > 0.3:
+            if not self.current_target in self.black_list:     
+                talk = cb.estimate(self.current_target, "WEREWOLF")
+            #if we're sure - comingout
+            else:
+                talk = cb.comingout(self.current_target, "WEREWOLF")
+        # estimate someone as villlager
+        elif p < 0.1 and self.white_list:
+            talk = cb.estimate(random.choice(self.white_list), "VILLAGER")
+        # present ourselves  as villager
         else:
-            talk = cb.comingout(self.current_target, "WEREWOLF")
+            talk = cb.comingout(self.id, "VILLAGER")
 
         return talk
 
@@ -264,30 +288,19 @@ class SampleAgent(object):
 
         # if there's an uncontested seer, protect him
         if self.seer_id not in [None, -1]:
-            return self.seer_id
+            self.guarded = self.seer_id
 
         # if there's an uncontested medium, protect him
         if self.medium_id not in [None, -1]:
-            return self.medium_id
+            self.guarded = self.medium_id
 
-        #TODO - maybe add some heuristic for villagers...
+        self.guarded = self.id
         
         #protect myself
-        return self.id
+        return self.guarded
     
     def finish(self):
         print("Executing finish...")
-
-    def updatePlayerMap(self, base_info):
-        for key, value in base_info["statusMap"].items():
-            agent_id = int(key)
-            if agent_id is not self.id:
-                if agent_id not in self.player_map:
-                    self.player_map[agent_id] = {}
-                    self.player_map[agent_id]["targetStatus"] = 0
-                    self.player_map[agent_id]["revenge"] = False
-                self.player_map[agent_id]["status"] = value
-                self.player_map[agent_id]["whispered"] = False
 
     def updateGameHistory(self, diff_data):
         '''
