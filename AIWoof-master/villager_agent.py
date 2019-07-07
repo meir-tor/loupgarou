@@ -255,7 +255,6 @@ class SampleAgent(object):
         '''
         checked_pairs = []
         for row in reversed(list(diff_data.itertuples())):
-            print(row, "AAAAAAA")
             agent = getattr(row, "agent")
             text = getattr(row, "text")
 
@@ -282,9 +281,6 @@ class SampleAgent(object):
             else:
                 continue
 
-            print("text is ", text)
-            print(match, "FFFFF")
-            
             target_role = match.group("role") if "role" in match.groupdict() else None
             target = match.group("target")
             target_id = int(re.match(RE_AGENT_GROUP, target).group("id")) - 1
@@ -418,4 +414,4 @@ def parseArgs(args):
 
 if __name__ == '__main__':    
     parseArgs(sys.argv[1:])
-    aiwolfpy.connect_parse(SampleAgent("omgyousuck"))
+    aiwolfpy.connect_parse(SampleAgent("loupgarou"))
