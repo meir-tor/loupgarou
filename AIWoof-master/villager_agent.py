@@ -28,7 +28,7 @@ class SampleAgent(object):
         self.myname = agent_name
 
     def initialize(self, base_info, diff_data, game_setting):
-        self.id = base_info["agentIdx"]
+        self.id = base_info["agentIdx"] - 1
         self.base_info = base_info
         self.game_setting = game_setting
 
@@ -37,15 +37,30 @@ class SampleAgent(object):
         self.target_list = []  # a queue storing possible targets to act against
         self.current_target = None
         
+        self.divine_map = {}
+        
         '''
         The info table stores the information we have about each player,
         along with it's provenance - the columns are the sources of information (other players)
         and the lines are the players - the sum of each line is a score - positive for villager, negative for werewolf.
         '''
         num_players = game_setting["playerNum"]
+        self.num_players = num_players
+        
+        self.my_role = base_info["myRole"]
         
         self.info_table = np.zeros([num_players,num_players])
 
+        # table of true role for werewoolf :  villager = +100 , wol = -100
+        self.true_table_role = np.zeros(num_players)
+        for i in range(len(base_info["roleMap"])):
+            role_map_idx = str(i+1)
+            if role_map_idx in base_info:
+                if base_info["roleMap"][role_map_idx] == "WEREWOLF":
+                    self.true_table_role[i] = -100
+            else:
+                self.true_table_role[i] = 100
+        
         #number of werewolves
         self.ww_number = game_setting["roleNumMap"]["WEREWOLF"]
 
@@ -108,19 +123,35 @@ class SampleAgent(object):
     def pickTarget(self):
         print("Executing pickTarget...")
         
-        #if i have someone on my black list, choose him as target
-        living_wws = [w for w in self.black_list if self.base_info["statusMap"][str(w)] == "ALIVE"]
-        if len(living_wws) > 0:
-            self.setTarget(living_wws[0])
+        if self.my_role == "WEREWOLF":
+            self.setTarget(self.minimal_score(isWerewolf=True))
         else:
-            self.setTarget(self.minimal_score())
+            #if i have someone on my black list, choose him as target
+            living_wws = [w for w in self.black_list if self.base_info["statusMap"][str(w+1)] == "ALIVE"]
+            if len(living_wws) > 0:
+                self.setTarget(living_wws[0])
+            else:
+                self.setTarget(self.minimal_score())
                 
 
-    def minimal_score(self, isSeer=False):
+    def minimal_score(self, isSeer=False, isWerewolf=False):
 
         # we use a copy so that if the value of some player changes we still have the information
         table = np.copy(self.info_table)
-
+        
+        if isWerewolf:
+            wolfscore = np.zeros(self.num_players)
+            #calculate the difference between estimation of a player and the reality 
+            for i in range(self.num_players):
+                if self.true_table_role[i] == -100:
+                    continue
+                else:
+                    for j in range(self.num_players):
+                        wolfscore[i] += np.abs(self.true_table_role[j] - table[j][i])
+            
+            
+            return np.argmin(wolfscore) + 1
+        
         #all the members in conflict are suspect to be werewolves
         suspects_list = set([y for x in self.conflict_list for y in x])
                             
@@ -145,13 +176,11 @@ class SampleAgent(object):
         for i in self.white_list:
             scores[i] += 3
 
-
         #if we are seer, we check for the player of which we have the least info
         if isSeer:
             scores = np.absolute(scores)
 
         # avoid voting for myself
-        #TODO - confirm that self.id - 1 is indeed my id
         scores[self.id - 1] = np.max(scores) + 1
 
         return np.argmin(scores) + 1
@@ -167,15 +196,27 @@ class SampleAgent(object):
         print("Executing talk...")
 
         #TODO - maybe talk of villagers?
+        
+        if self.my_role == "WEREWOLF":
+            #with proba , estimate our target as wolf ,with proba q comingout target as wolf, 1-p-q skip talking 
+            p = np.random.uniform()
+            if p < .35:     
+                talk = cb.estimate(self.current_target, "WEREWOLF")
+            #if we're sure - comingout
+            elif p > .6:
+                talk = cb.comingout(self.current_target, "WEREWOLF")
+            else: #skip
+                talk = cb.skip()
+            return talk
 
         #if i am seer and i know most of werewolves - tell the world i know the werewolves as seer
         if self.seer_id == self.id:
-            werewolves = [x for x in self.base_info["roleMap"] if self.base_info["roleMap"][x] == "WEREWOLF"]
+            werewolves = [x for x in self.divine_map if self.divine_map[x] == "WEREWOLF"]
 
             #if we know more than half of the werewolves, reveal one of them
             if len(werewolves) >= 0.5 * self.ww_number:
-                living_ww = [x for x in werewolves if self.base_info["statusMap"][x] == "ALIVE"]
-                if living_ww:
+                living_ww = [x for x in werewolves if self.base_info["statusMap"][str(x+1)] == "ALIVE"]
+                if len(living_ww) > 0:
                     return cb.divined(random.choice(living_ww, "WEREWOLF"))
 
         #if we're not sure our target is a werewolf - estimate
@@ -214,8 +255,7 @@ class SampleAgent(object):
     def divine(self):
         print("Executing divine...")
 
-        #TODO - understand where is the information from divination received
-        target = self.minimal_score(isSeer=True)        
+        target = self.minimal_score(isSeer=True)
         return target
 
     def guard(self):
@@ -255,9 +295,24 @@ class SampleAgent(object):
         '''
         checked_pairs = []
         for row in reversed(list(diff_data.itertuples())):
-            print(row, "AAAAAAA")
-            agent = getattr(row, "agent")
+            agent = getattr(row, "agent") - 1
             text = getattr(row, "text")
+            talk_type = getattr(row, "type")
+            
+            if talk_type == "divine":
+                match = re.match(RE_DIVINED, text)
+                
+                target_role = match.group("species")
+                target = match.group("target")
+                target_id = int(re.match(RE_AGENT_GROUP, target).group("id")) - 1
+
+                self.divine_map[target_id] = target_role
+                
+                if target_role == "VILLAGER":
+                    self.white_list.append(target_id)
+                else:
+                    self.black_list.append(target_id)
+                continue
 
             #if it's our talking, we don't need to analyze it
             if agent == self.id:
@@ -282,9 +337,6 @@ class SampleAgent(object):
             else:
                 continue
 
-            print("text is ", text)
-            print(match, "FFFFF")
-            
             target_role = match.group("role") if "role" in match.groupdict() else None
             target = match.group("target")
             target_id = int(re.match(RE_AGENT_GROUP, target).group("id")) - 1
@@ -418,4 +470,4 @@ def parseArgs(args):
 
 if __name__ == '__main__':    
     parseArgs(sys.argv[1:])
-    aiwolfpy.connect_parse(SampleAgent("omgyousuck"))
+    aiwolfpy.connect_parse(SampleAgent("loupgarou"))
