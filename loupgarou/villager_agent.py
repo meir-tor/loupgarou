@@ -308,10 +308,16 @@ class SampleAgent(object):
             #SEER updates his werewolves and villagers' lists, based on the divine info
             if talk_type == "divine":
                 match = re.match(RE_DIVINED, text)
+                if match is None:
+                    continue
                 
                 target_role = match.group("species")
                 target = match.group("target")
-                target_id = int(re.match(RE_AGENT_GROUP, target).group("id")) - 1
+                
+                target_id_match = re.match(RE_AGENT_GROUP, target)
+                if target_id_match is None:
+                    continue
+                target_id = int(target_id_match.group("id")) - 1
 
                 self.divine_map[target_id] = target_role
                 
@@ -324,10 +330,16 @@ class SampleAgent(object):
             #MEDIUM updates his werewolves and villagers' lists, based on the divine info
             if talk_type == "identify":
                 match = re.match(RE_IDENTIFIED, text)
+                if match is None:
+                    continue
                 
                 target_role = match.group("species")
                 target = match.group("target")
-                target_id = int(re.match(RE_AGENT_GROUP, target).group("id")) - 1
+                
+                target_id_match = re.match(RE_AGENT_GROUP, target)
+                if target_id_match is None:
+                    continue
+                target_id = int(target_id_match.group("id")) - 1
 
                 self.divine_map[target_id] = target_role
                 
@@ -345,6 +357,7 @@ class SampleAgent(object):
             target_role = None
             
             #find the target of sentence
+            match = None
             if "ESTIMATE" in text:
                 match = re.match(RE_ESTIMATE, text[text.index("ESTIMATE"):])
             elif "VOTE" in text:
@@ -359,10 +372,17 @@ class SampleAgent(object):
                 match = re.match(RE_GUARDED, text[text.index("GUARDED"):])
             else:
                 continue
-
+            
+            if match is None:
+                continue
+                
             target_role = match.group("role") if "role" in match.groupdict() else None
             target = match.group("target")
-            target_id = int(re.match(RE_AGENT_GROUP, target).group("id")) - 1
+            
+            target_id_match = re.match(RE_AGENT_GROUP, target)
+            if target_id_match is None:
+                continue
+            target_id = int(target_id_match.group("id")) - 1
 
             #if we already saw the last things the agent had to say about the target,
             # no need to read previous talks
